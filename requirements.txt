@@ -1,0 +1,10 @@
+confluent-kafka[avro]==2.3.0
+fastapi==0.110.1
+kafka-python==2.0.2
+geopy==2.4.1
+openmeteo-requests==1.2.0
+pandas==2.1.4
+pydantic
+requests-cache==1.2.0
+retry-requests==2.0.0
+uvicorn==0.29.0
