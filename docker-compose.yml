@@ -39,7 +39,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      #POSTGRES_DB: ${POSTGRES_DB}
     healthcheck:
       test: [ "CMD", "pg_isready", "-q", "-d", "postgres", "-U", "${POSTGRES_USER}" ]
       timeout: 45s
@@ -48,7 +48,7 @@ services:
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      #- ./sql:/docker-entrypoint-initdb.d
+      - ./sql:/docker-entrypoint-initdb.d
     ports:
       - 5432:5432
   
@@ -63,7 +63,7 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     ports:
-      - 8888:80
+      - 81:80
     depends_on:
       - postgres
 
@@ -196,6 +196,8 @@ services:
 
   schema-registrar:
     image: curlimages/curl:latest
+    hostname: schema-registrar
+    container_name: schema-registrar
     depends_on:
       - schema-registry
     volumes:
@@ -235,6 +237,80 @@ services:
     depends_on:
       - broker
 
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  # Spark Cluster
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  # Spark Master Node
+  spark-master:
+    #image: docker.io/bitnami/spark:3.5.1
+    image: ${SPARK_IMAGE_NAME}
+    container_name: spark_master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - "./execution_scripts:/execution_scripts:rw"
+    ports:
+      - 9090:8080
+      - 7077:7077
+
+  # Spark Worker Node 1
+  spark-worker:
+    #image: docker.io/bitnami/spark:3.5.1
+    image: ${SPARK_IMAGE_NAME}
+    container_name: spark_worker_1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+
+  # Spark Worker Node 1
+  #spark-worker-2:
+  #  #image: docker.io/bitnami/spark:3.5.1
+  #  image: ${SPARK_IMAGE_NAME}
+  #  container_name: spark_worker_2
+  #  environment:
+  #    - SPARK_MODE=worker
+  #    - SPARK_MASTER_URL=spark://spark-master:7077
+  #    - SPARK_WORKER_MEMORY=2G
+  #    - SPARK_WORKER_CORES=1
+  #    - SPARK_RPC_AUTHENTICATION_ENABLED=no
+  #    - SPARK_RPC_ENCRYPTION_ENABLED=no
+  #    - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+  #    - SPARK_SSL_ENABLED=no
+
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  # Dev Environments
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  # Jupyterlab Server
+  jupyterlab:
+    #image: ${JUPYTER_IMAGE_NAME:-quay.io/jupyter/datascience-notebook:lab-4.1.3}
+    build:
+      context: ./docker
+      dockerfile: jupyter.Dockerfile
+    image: ${JUPYTER_IMAGE_NAME}
+    container_name: jupyterlab_server
+    environment:
+      - JUPYTER_ENABLE_LAB=${JUPYTER_ENABLE_LAB}
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN}
+      - GRANT_SUDO=${GRANT_SUDO}
+      - PYSPARK_PYTHON=python3
+      - PYSPARK_DRIVER_PYTHON=jupyter
+      - PYSPARK_DRIVER_PYTHON_OPTS='notebook'
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    volumes:
+      - ./data:/home/jovyan/data
+      - ./notebooks:/home/jovyan/notebooks
+    ports:
+      - 8888:8888
 
 volumes:
   postgres_data:

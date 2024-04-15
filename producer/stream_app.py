@@ -1,36 +1,15 @@
 from fastapi import FastAPI, HTTPException
+from kafka import KafkaProducer
+import json
 from pydantic import BaseModel
 import logging
-from confluent_kafka import SerializingProducer
-from confluent_kafka.schema_registry import SchemaRegistryClient
-from confluent_kafka.schema_registry.avro import AvroSerializer
-from confluent_kafka.serialization import StringSerializer
 
-# Logger Configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+
 
 app = FastAPI()
 
-# Schema Registry Configuration
-schema_registry_url = "http://localhost:8081"
-schema_registry_client = SchemaRegistryClient({'url': schema_registry_url})
-
-# Get the schema for the specific topic
-schema_metadata = schema_registry_client.get_latest_version("jp-weather")
-schema_str = schema_metadata.schema.schema_str
-
-# Initialize the AvroSerializer
-avro_serializer = AvroSerializer(schema_str=schema_str, schema_registry_client=schema_registry_client)
-
-producer_conf = {
-    'bootstrap.servers': 'localhost:9092',
-    'key.serializer': StringSerializer('utf_8'),
-    'value.serializer': avro_serializer
-}
-
-producer = SerializingProducer(producer_conf)
-
+# Define el modelo de datos usando Pydantic para la validación automática
 class WeatherData(BaseModel):
     date_UTC: str
     temperature_2m: float
@@ -54,15 +33,22 @@ class WeatherData(BaseModel):
     UtcOffsetSeconds: int
     date: str
 
+# Configuración del productor de Kafka
+producer = KafkaProducer(
+    bootstrap_servers=['localhost:9092'],  # Cambia según tu configuración de Kafka
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
 @app.post("/weather/")
-def send_weather_data(weather: WeatherData):
+async def send_data(weather_data: WeatherData):
     try:
-        # Convert the data to dictionary
-        weather_dict = weather.dict()
-        producer.produce(topic='jp-weather', key=str(weather.date_UTC), value=weather_dict)
+        # Envía los datos al tópico de Kafka
+        value=weather_data.dict()
+        key=f"{value['date'].replace('-','').replace(' ','').replace(':', '')[:14]}{value['location_id']:03d}".encode('utf-8')
+        producer.send('jp-weather', key=key, value=value)
         producer.flush()
-        logger.info(f"Data sent for {weather.date_UTC}")
-        return {"message": "Data sent successfully"}
+        logging.info("Data sent to Kafka successfully")
+        return {"message": "Data sent to Kafka successfully"}
     except Exception as e:
-        logger.error(f"Failed to send data: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to send data")
+        logging.error(f"Failed to send data to Kafka: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
