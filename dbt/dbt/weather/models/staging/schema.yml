@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: staging
+    database: "{{ env_var('PROJECT_ID') }}"
+    schema: "{{ env_var('BIGQUERY_DATASET') }}"
+    tables:
+      - name: weather_staging

@@ -1,0 +1,7 @@
+#confluent-kafka==2.3.0
+kafka-python==2.0.2
+fastapi==0.110.1
+fastavro==1.9.4
+pydantic==2.6.4
+requests==2.31.0
+uvicorn==0.29.0

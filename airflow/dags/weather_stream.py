@@ -9,7 +9,7 @@ default_args = {
     'owner': 'airflow',
     'start_date': datetime(2023, 1, 1),
     'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'retry_delay': timedelta(minutes=3),
 }
 
 def get_weather_data(ti, start_date, end_date):
@@ -20,8 +20,8 @@ def get_weather_data(ti, start_date, end_date):
     from retry_requests import retry
     from geopy.geocoders import Nominatim
     
-    #start_date = Variable.get("start_date")
-    #end_date = Variable.get("end_date")
+    start_date = Variable.get("start_date")
+    end_date = Variable.get("end_date")
     
     cache_session = requests_cache.CachedSession('.cache', expire_after = -1)
     retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
@@ -32,8 +32,8 @@ def get_weather_data(ti, start_date, end_date):
     params = {
         "latitude": [35.6766, 35.4657, 34.6924, 35.1845, 43.058, 33.5677, 38.2677, 34.9844, 35.8875, 34.4112],
         "longitude": [139.6911, 139.6154, 135.512, 136.9515, 141.4286, 130.3717, 140.8691, 135.7572, 139.6512, 132.4528],
-        "start_date": "2024-01-01",
-        "end_date": "2024-01-02",
+        "start_date": start_date,
+        "end_date": end_date,
         "hourly": ["temperature_2m", "relative_humidity_2m", "dew_point_2m", "apparent_temperature", "precipitation", "weather_code", "wind_speed_10m", "wind_speed_100m", "wind_direction_10m", "wind_direction_100m", "is_day", "sunshine_duration"],
         "timezone": "Asia/Tokyo"
     }
@@ -116,7 +116,7 @@ def stream_to_kafka(ti):
     df['date_UTC'] = df['date_UTC'].astype(str)
     df['date'] = df['date'].astype(str)
     api_url = 'http://api-producer:8000/weather'
-    for index, row in df.sample(10).iterrows():
+    for index, row in df.iterrows():
         data = row.to_dict()
         #print(data)
         response = requests.post(api_url, json=data)
@@ -124,7 +124,7 @@ def stream_to_kafka(ti):
             print(f'Datos de la fila {index} enviados correctamente')
         else:
             print(f'Error al enviar datos de la fila {index}: {response.text}')
-        sleep(5)
+        #sleep(2)
 
 with DAG('weather_data_kafka',
          default_args=default_args,

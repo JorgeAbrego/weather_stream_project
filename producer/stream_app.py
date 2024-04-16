@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 app = FastAPI()
 
-# Define el modelo de datos usando Pydantic para la validación automática
+# Define the data model using Pydantic for automatic validation
 class WeatherData(BaseModel):
     date_UTC: str
     temperature_2m: float
@@ -33,16 +33,16 @@ class WeatherData(BaseModel):
     UtcOffsetSeconds: int
     date: str
 
-# Configuración del productor de Kafka
+# Kafka Producer Configuration
 producer = KafkaProducer(
-    bootstrap_servers=['localhost:9092'],  # Cambia según tu configuración de Kafka
+    bootstrap_servers=['broker:29092'],
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
 @app.post("/weather/")
 async def send_data(weather_data: WeatherData):
     try:
-        # Envía los datos al tópico de Kafka
+        # Send data to Kafka topic
         value=weather_data.dict()
         key=f"{value['date'].replace('-','').replace(' ','').replace(':', '')[:14]}{value['location_id']:03d}".encode('utf-8')
         producer.send('jp-weather', key=key, value=value)

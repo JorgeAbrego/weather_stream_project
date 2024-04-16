@@ -4,7 +4,12 @@
 #apache-airflow-providers-google==10.15.0
 #apache-airflow-providers-postgres==5.10.1
 pandas==2.1.4
+pandas-gbq==0.22.0
 psycopg2-binary==2.9.9
+geopy==2.4.1
+openmeteo-requests==1.2.0
+requests-cache==1.2.0
+retry-requests==2.0.0
 #pyarrow==14.0.2
 #pyspark==3.5.0
 #sqlalchemy==1.4.51

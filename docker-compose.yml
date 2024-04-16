@@ -17,16 +17,34 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/keys/service-account-file.json
+    PG_USER: ${POSTGRES_USER}
+    PG_PASS: ${POSTGRES_PASSWORD}
+    PROJECT_ID: ${GCP_PROJECT_ID}
+    DATASET_NAME: ${GCP_BIGUERY_DATASET}
+    DBT_PROJ_DIR: ${DBT_PROJ_DIR}
+    DBT_CONFIG_PATH: ${DBT_CONFIG_PATH}
+    GCP_SA_KEY: ${GCP_SA_KEY}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ${PROJECT_DIR:-.}/scripts/set-airflow-vars-conn.sh:/opt/airflow/set-airflow-vars-conn.sh
+    - ${GCP_SA_KEY}:/opt/airflow/keys/service-account-file.json
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
     postgres:
       condition: service_healthy
+
+x-spark-image:
+  &spark-image
+  #image: ${SPARK_IMAGE_NAME:-docker.io/bitnami/spark:3.5.1}
+  build:
+    context: ./docker
+    dockerfile: spark.Dockerfile
+  image: ${SPARK_IMAGE_NAME}
 
 services:
   #--------------------------------------------------------------------------------------------------------------------------------------#
@@ -74,10 +92,10 @@ services:
   airflow-webserver:
     <<: *airflow-common
     container_name: airflow_webserver
-    command: webserver
-    #command: >
-    #  bash -c "/opt/airflow/create_airflow_connections.sh &&
-    #  exec /entrypoint airflow webserver"
+    #command: webserver
+    command: >
+      bash -c "/opt/airflow/set-airflow-vars-conn.sh &&
+      exec /entrypoint airflow webserver"
     ports:
       - "8080:8080"
     healthcheck:
@@ -243,7 +261,8 @@ services:
   # Spark Master Node
   spark-master:
     #image: docker.io/bitnami/spark:3.5.1
-    image: ${SPARK_IMAGE_NAME}
+    #image: ${SPARK_IMAGE_NAME}
+    <<: *spark-image
     container_name: spark_master
     environment:
       - SPARK_MODE=master
@@ -260,7 +279,8 @@ services:
   # Spark Worker Node 1
   spark-worker:
     #image: docker.io/bitnami/spark:3.5.1
-    image: ${SPARK_IMAGE_NAME}
+    #image: ${SPARK_IMAGE_NAME}
+    <<: *spark-image
     container_name: spark_worker_1
     environment:
       - SPARK_MODE=worker
@@ -288,6 +308,48 @@ services:
   #    - SPARK_SSL_ENABLED=no
 
   #-------------------------------------------------------------------------------------------------------------------------------------------#
+  # dbt project
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  dbt-bg:
+    build:
+      context: ./docker
+      dockerfile: dbt.Dockerfile
+      target: dbt-bigquery
+    image: dbt-bigquery:v1
+    container_name: dbt_env
+    environment:
+      GOOGLE_CLOUD_PROJECT: ${GCP_PROJECT_ID}
+      PROJECT_ID: ${GCP_PROJECT_ID}
+      BIGQUERY_DATASET: ${GCP_BIGUERY_DATASET}
+    env_file:
+      - .env
+    volumes:
+      - ${DBT_PROJ_DIR}:/usr/app
+      - ${DBT_CONFIG_PATH}:/root/.dbt/
+      - ${GCP_SA_KEY}:/root/.google/credentials/google_credentials.json
+
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  # Docker Proxy
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  docker-proxy:
+    build:
+        context: ./docker
+        dockerfile: dockerSocat.Dockerfile
+    image: docker-socat:v1
+    container_name: docker-proxy
+    environment:
+      PROJECT_ID: ${GCP_PROJECT_ID}
+      BIGQUERY_DATASET: ${GCP_BIGUERY_DATASET}
+    command: "TCP4-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock"
+    ports:
+      - "2376:2375"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DBT_PROJ_DIR}:/dbt/projects
+      - ${DBT_CONFIG_PATH}:/dbt/config
+      #- ${GCP_SA_KEY}:/dbt/keys/google_credentials.json
+
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
   # Dev Environments
   #-------------------------------------------------------------------------------------------------------------------------------------------#
   # Jupyterlab Server
@@ -311,6 +373,18 @@ services:
       - ./notebooks:/home/jovyan/notebooks
     ports:
       - 8888:8888
+
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  # API Producer Deployment
+  #-------------------------------------------------------------------------------------------------------------------------------------------#
+  api-producer:
+    build:
+      context: ./producer
+      dockerfile: producer.Dockerfile
+    image: weather-producer:v1
+    container_name: api-producer
+    depends_on:
+      - broker
 
 volumes:
   postgres_data:
