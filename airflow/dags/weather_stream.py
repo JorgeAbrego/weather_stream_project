@@ -7,6 +7,7 @@ from airflow.models import Variable
 
 default_args = {
     'owner': 'airflow',
+    'description' : 'Dag to simulate streaming data from an API',
     'start_date': datetime(2023, 1, 1),
     'retries': 1,
     'retry_delay': timedelta(minutes=3),
@@ -121,9 +122,9 @@ def stream_to_kafka(ti):
         #print(data)
         response = requests.post(api_url, json=data)
         if response.status_code == 200:
-            print(f'Datos de la fila {index} enviados correctamente')
+            print(f'Data from row {index} was sent successfully')
         else:
-            print(f'Error al enviar datos de la fila {index}: {response.text}')
+            print(f'An error occurred trying sending data from row {index}: {response.text}')
         #sleep(2)
 
 with DAG('weather_data_kafka',

@@ -71,6 +71,7 @@ def load_to_bigquery():
 with DAG('postgres_to_bigquery',
          default_args=default_args,
          schedule_interval='@daily',
+         #schedule_interval=None,
          catchup=False) as dag:
 
     start = DummyOperator(task_id='start')

@@ -6,17 +6,17 @@ from airflow.operators.docker_operator import DockerOperator
 from docker.types import Mount
 
 default_args = {
-'owner'                 : 'airflow',
-'description'           : 'Run dbt project to build fact tables',
-'start_date'            : datetime(2021, 5, 1),
-'retries'               : 1,
-'retry_delay'           : timedelta(minutes=5)
+    'owner' : 'airflow',
+    'description' : 'Run dbt project to build fact tables',
+    'start_date' : datetime(2021, 5, 1),
+    'retries' : 1,
+    'retry_delay' : timedelta(minutes=5)
 }
 
 with DAG('dbt_run_project', 
          default_args=default_args, 
-         #schedule_interval='@monthly',
-         schedule_interval=None,
+         schedule_interval='@daily',
+         #schedule_interval=None,
          catchup=False) as dag:
 
     t1 = BashOperator(

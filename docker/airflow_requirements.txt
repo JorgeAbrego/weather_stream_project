@@ -1,6 +1,6 @@
 apache-airflow-providers-docker==3.9.1
 pandas==2.1.4
-pandas-gbq==0.22.0
+pandas-gbq==0.21.0
 psycopg2-binary==2.9.9
 geopy==2.4.1
 openmeteo-requests==1.2.0

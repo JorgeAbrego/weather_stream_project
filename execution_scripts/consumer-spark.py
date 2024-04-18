@@ -5,9 +5,8 @@ from pyspark.sql.types import *
 # Create the Spark session
 spark = SparkSession.builder \
     .appName("KafkaWeatherConsumer") \
-    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,"
-                                    "org.postgresql:postgresql:42.2.5") \
-    .master("local[*]") \
+    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,org.postgresql:postgresql:42.2.5") \
+    .master("spark://spark-master:7077") \
     .getOrCreate()
 
 # Define the data schema
